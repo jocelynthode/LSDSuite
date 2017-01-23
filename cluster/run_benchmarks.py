@@ -132,7 +132,7 @@ if __name__ == '__main__':
         APP_CONFIG,
         CLUSTER_PARAMETERS,
         args.local,
-        log_level,
+        args.tracker,
         churn)
     benchmark.set_logger_level(log_level)
 
