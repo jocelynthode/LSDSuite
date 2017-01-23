@@ -1,0 +1,4 @@
+manager_ip: 'x.x.x.x'
+local_manager_ip: 'x.x.x.x'
+local_data: '/some/path/to/data'
+cluster_data: '/some/path/to/data'

@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'com.palantir.docker' version '0.5.2'
+}
+
+group '<group.app>'
+version '<version>'
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '3.1'
+    distributionUrl = "https://services.gradle.org/distributions/gradle-$gradleVersion-all.zip"
+}
+
+repositories {
+    mavenCentral()
+}
+
+task mkdirLibs {
+    mkdir('build/libs')
+}
+
+dependencies {
+}
+
+docker {
+    name 'app'
+    dependsOn tasks.mkdirLibs
+    dependsOn tasks.shadowJar
+    files 'build/libs', 'scripts/'
+}

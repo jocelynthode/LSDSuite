@@ -1,0 +1,22 @@
+service:
+  name: "service_name"
+  network:
+    name: "network_name"
+    subnet: "x.x.x.x/y"
+  mem_limit: 314572800
+  parameters:
+    SOME: 500
+    PARAMS: 1000
+    FOR: 26
+    YOUR: 4
+    APP: 0
+repository:
+  name: "repository-with-trailing-slash/"
+tracker: # Only add if asyou plan on using a tracker
+  name: "tracker_name"
+real_churn: # Database must be in sqlite3 format
+  database: "database.db"
+  epoch: 0 # in seconds
+  start_time: 10
+  duration: 7200
+  time_factor: 2 # Time multiplicator for the real churn
