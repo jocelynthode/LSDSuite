@@ -114,7 +114,7 @@ if __name__ == '__main__':
         hosts_fname = None
         repository = ''
     else:
-        hosts_fname = 'hosts'
+        hosts_fname = 'config/hosts'
         repository = APP_CONFIG['repository']['name']
 
     if args.churn:
