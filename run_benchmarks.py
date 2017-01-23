@@ -14,15 +14,15 @@ import signal
 from logging import config
 
 import yaml
-from benchmark import Benchmark
-from churn import Churn
+from lsdssuite import Benchmark
+from lsdssuite import Churn
 
-with open('config.yaml', 'r') as f:
+with open('config/config.yaml', 'r') as f:
     CLUSTER_PARAMETERS = yaml.load(f)
 
 
 def create_logger():
-    with open('logger.yaml') as f:
+    with open('config/logger.yaml') as f:
         conf = yaml.load(f)
         logging.config.dictConfig(conf)
 
