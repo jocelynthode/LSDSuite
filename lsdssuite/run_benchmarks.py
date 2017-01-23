@@ -52,9 +52,9 @@ if __name__ == '__main__':
         type=int,
         help='For how long should the experiment run in seconds')
     parser.add_argument(
-        'config',
+        'app_config',
         type=argparse.FileType('r'),
-        help='Configuration file')
+        help='Application configuration file')
     parser.add_argument('-l', '--local', action='store_true',
                         help='Run locally')
     parser.add_argument(
@@ -99,7 +99,7 @@ if __name__ == '__main__':
              'should the tester start in ms')
 
     args = parser.parse_args()
-    APP_CONFIG = yaml.load(args.config)
+    APP_CONFIG = yaml.load(args.app_config)
 
     if args.verbose:
         log_level = logging.DEBUG

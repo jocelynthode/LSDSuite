@@ -12,10 +12,10 @@ service:
     APP: 0
 repository:
   name: "repository-with-trailing-slash/"
-tracker: # Only add if asyou plan on using a tracker
+tracker: # Only add if you plan on using a tracker
   name: "tracker_name"
 real_churn: # Database must be in sqlite3 format
-  database: "database.db"
+  database: "databases/database.db"
   epoch: 0 # in seconds
   start_time: 10
   duration: 7200
