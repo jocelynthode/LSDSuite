@@ -2,6 +2,7 @@ import logging
 
 import random
 import subprocess
+import yaml
 
 
 class Churn:
@@ -12,7 +13,7 @@ class Churn:
     """
 
     def __init__(self, hosts_filename=None, service_name='', repository='',
-                 period=5000, delay=0, synthetic=None):
+                 period=5000, delay=0, synthetic=False):
         self.containers = {}
         self.peer_list = []
         self.logger = logging.getLogger('churn')
@@ -23,6 +24,8 @@ class Churn:
         self.period = period
         self.delay = delay
         self.synthetic = synthetic
+        with open('config/churn.yaml', 'r') as f:
+            self.churn_params = yaml.load(f)
         self.hosts = ['localhost']
         if hosts_filename is not None:
             with open(hosts_filename, 'r') as file:
