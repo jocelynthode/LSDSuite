@@ -1,9 +1,9 @@
+# coding: utf-8
 import logging
 import re
 import subprocess
 import threading
 import time
-import yaml
 from datetime import datetime
 
 import docker
