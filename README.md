@@ -1,6 +1,6 @@
-# LSDSSuite
+# LSDSuite
 
-Benchmarking Framework for LSDS applications
+Benchmarking Framework for Large-Scale Distributed Systems (LSDS)
 
 ## Requirements
 * Docker >= 1.12
