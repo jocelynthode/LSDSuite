@@ -6,10 +6,7 @@ import threading
 import time
 from datetime import datetime
 
-import docker
-from docker import errors
-from docker import types
-from docker import utils
+import pykube
 from .nodes_trace import NodesTrace
 
 
@@ -20,17 +17,20 @@ class Benchmark:
     A class in charge of Setting up and running a benchmark
     """
 
-    def __init__(self, app_config, cluster_config, local, use_tracker,
+    def __init__(self, job_config, cluster_config, local, tracker_config = None,
                  churn=None,
-                 client=docker.DockerClient(
-                     base_url='unix://var/run/docker.sock')):
-        self.client = client
-        self.app_config = app_config
+                 client=None):
+        if client is None:
+            self.client = pykube.HTTPClient(pykube.KubeConfig.from_file(
+                cluster_config['k8s_config']))
+        else:
+            self.client = client
+        self.job_config = job_config
         self.cluster_config = cluster_config
         self.local = local
         self.logger = logging.getLogger('benchmarks')
         self.churn = churn
-        self.use_tracker = use_tracker
+        self.tracker_config = tracker_config
 
     def run(self, time_add, time_to_run, peer_number, runs=1):
         """
@@ -43,112 +43,26 @@ class Benchmark:
         """
         time_add *= 1000
         time_to_run *= 1000
-        if self.local:
-            service_image = self.app_config['service']['name']
-            if self.use_tracker:
-                tracker_image = self.app_config['tracker']['name']
-            with subprocess.Popen(['../gradlew', '-p', '..', 'docker'],
-                                  stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE,
-                                  universal_newlines=True) as p:
-                for line in p.stdout:
-                    print(line, end='')
-        else:
-            service_image = (self.app_config['repository']['name']
-                             + self.app_config['service']['name'])
-            self.logger.info(self.client.images.pull(service_image))
-
-            if self.use_tracker:
-                tracker_image = (self.app_config['repository']['name']
-                                 + self.app_config['tracker']['name'])
-                self.logger.info(self.client.images.pull(tracker_image))
-
-            try:
-                self.client.swarm.init()
-                if not self.local:
-                    self.logger.info('Joining Swarm on every hosts:')
-                    token = self.client.swarm.attrs['JoinTokens']['Worker']
-                    subprocess.call(
-                        [
-                            'parallel-ssh',
-                            '-t',
-                            '0',
-                            '-h',
-                            'config/hosts',
-                            'docker',
-                            'swarm',
-                            'join',
-                            '--token',
-                            token,
-                            '{:s}:2377'.format(
-                                self.cluster_config['manager_ip'])])
-                ipam_pool = utils.create_ipam_pool(
-                    subnet=self.app_config['service']['network']['subnet'])
-                ipam_config = utils.create_ipam_config(
-                    pool_configs=[ipam_pool])
-                self.client.networks.create(
-                    self.app_config['service']['network']['name'],
-                    driver='overlay', ipam=ipam_config)
-            except errors.APIError:
-                self.logger.info('Host is already part of a swarm')
-                if not self.client.networks.list(
-                        names=[self.app_config['service']['network']['name']]):
-                    self.logger.error('Network  doesn\'t exist!')
-                    exit(1)
+        log_storage = (self.cluster_config['local_data']
+                       if self.local
+                       else self.cluster_config['cluster_data'])
 
         for run_nb, _ in enumerate(range(runs), 1):
-            if self.use_tracker:
-                self._create_service(
-                    self.app_config['tracker']['name'],
-                    tracker_image,
-                    placement=['node.role == manager'],
-                    mem_limit=self.app_config['service']['mem_limit'])
-                self._wait_on_service(self.app_config['tracker']['name'], 1)
+            if self.tracker_config:
+                tracker = self._create_service(
+                    self.tracker_config)
+
             time_to_start = int((time.time() * 1000) + time_add)
             self.logger.debug(
                 datetime.utcfromtimestamp(
                     time_to_start /
                     1000).isoformat())
+            environment_vars = [{'name': 'PEER_NUMBER', 'value': peer_number},
+                                {'name': 'TIME', 'value': time_to_start},
+                                {'name': 'TIME_TO_RUN', 'value': time_to_run}]
 
-            environment_vars = {'PEER_NUMBER': peer_number,
-                                'TIME': time_to_start,
-                                'TIME_TO_RUN': time_to_run}
-            if 'parameters' in self.app_config['service']:
-                environment_vars.update(
-                    self.app_config['service']['parameters'])
-            environment_vars = [
-                '{:s}={}'.format(k, v) for k, v in environment_vars.items()]
-            self.logger.debug(environment_vars)
-
-            service_replicas = 0 if self.churn else peer_number
-            log_storage = (self.cluster_config['local_data']
-                           if self.local
-                           else self.cluster_config['cluster_data'])
-
-            if 'mem_limit' in self.app_config['service']:
-                self._create_service(
-                    self.app_config['service']['name'],
-                    service_image,
-                    env=environment_vars,
-                    mounts=[
-                        types.Mount(
-                            target='/data',
-                            source=log_storage,
-                            type='bind')],
-                    replicas=service_replicas,
-                    mem_limit=self.app_config['service']['mem_limit'])
-            else:
-                self._create_service(
-                    self.app_config['service']['name'],
-                    service_image,
-                    env=environment_vars,
-                    mounts=[
-                        types.Mount(
-                            target='/data',
-                            source=log_storage,
-                            type='bind')],
-                    replicas=service_replicas)
+            job = self._create_service(self.job_config)
+            job.obj['spec']['template']['spec']['containers'][0]['env'] += environment_vars
 
             self.logger.info(
                 'Running Benchmark -> Experiment: {:d}/{:d}'.format(
@@ -159,7 +73,7 @@ class Benchmark:
                         time_to_start + self.churn.delay], daemon=True)
                 thread.start()
                 self._wait_on_service(
-                    self.app_config['service']['name'], 0, inverse=True)
+                    self.job_config['service']['name'], 0, inverse=True)
                 self.logger.info('Running with churn')
                 if self.churn.synthetic:
                     # Wait for some peers to at least start
@@ -168,7 +82,7 @@ class Benchmark:
                              in zip(*self.churn.churn_params['synthetic'])]
                     # Wait until only stopped containers are still alive
                     self._wait_on_service(
-                        self.app_config['service']['name'],
+                        self.job_config['service']['name'],
                         containers_nb=total[0],
                         total_nb=total[1])
                 else:
@@ -177,11 +91,12 @@ class Benchmark:
                     time.sleep(300)  # Wait 5 more minutes
 
             else:
-                self._wait_on_service(
-                    self.app_config['service']['name'], 0, inverse=True)
                 self.logger.info('Running without churn')
-                self._wait_on_service(self.app_config['service']['name'], 0)
-            self.stop()
+                self._wait_on_job_completion(job)
+            if self.tracker_config:
+                self.stop(job, tracker=tracker)
+            else:
+                self.stop(job)
 
             self.logger.info('Services removed')
             time.sleep(30)
@@ -210,31 +125,28 @@ class Benchmark:
 
         self.logger.info('Benchmark done!')
 
-    def stop(self, is_signal=False):
+    def stop(self, job, is_signal=False, tracker=None):
         """
         Stop the benchmark and get every logs
 
         :return:
         """
-        try:
-            if self.use_tracker:
-                self.client.api.remove_service(self.app_config['tracker']['name'])
-            self.client.api.remove_service(self.app_config['service']['name'])
-            if not self.local and is_signal:
-                time.sleep(15)
-                with open('config/hosts', 'r') as file:
-                    for host in file.read().splitlines():
-                        subprocess.call('rsync --remove-source-files '
-                                        '-av {:s}:{:s}/*.txt ../data'
-                                        .format(host, self.cluster_config['cluster_data']),
-                                        shell=True)
-                        subprocess.call(
-                            'rsync --remove-source-files '
-                            '-av {:s}:{:s}/capture/*.csv ../data/capture'
-                                .format(host, self.cluster_config['cluster_data']),
-                            shell=True)
-        except errors.NotFound:
-            pass
+        job.delete()
+        if self.tracker_config and tracker is not None:
+            tracker.delete()
+        if not self.local and is_signal:
+            time.sleep(15)
+            with open('config/hosts', 'r') as file:
+                for host in file.read().splitlines():
+                    subprocess.call('rsync --remove-source-files '
+                                    '-av {:s}:{:s}/*.txt ../data'
+                                    .format(host, self.cluster_config['cluster_data']),
+                                    shell=True)
+                    subprocess.call(
+                        'rsync --remove-source-files '
+                        '-av {:s}:{:s}/capture/*.csv ../data/capture'
+                            .format(host, self.cluster_config['cluster_data']),
+                        shell=True)
 
     def set_logger_level(self, log_level):
         """
@@ -289,23 +201,13 @@ class Benchmark:
 
     def _create_service(
             self,
-            service_name,
-            image,
-            env=None,
-            mounts=None,
-            placement=None,
-            replicas=1,
-            mem_limit=314572800):
-        network = self.app_config['service']['network']['name']
-        self.client.services.create(image,
-                                    name=service_name,
-                                    restart_policy=types.RestartPolicy(),
-                                    env=env,
-                                    mode={'Replicated': {'Replicas': replicas}},
-                                    networks=[network],
-                                    resources=types.Resources(mem_limit=mem_limit),
-                                    mounts=mounts,
-                                    constraints=placement)
+            config):
+        tracker = pykube.Deployment(self.client, config)
+        tracker.create()
+        # TODO check if it can  be improved
+        subprocess.run(['kubectl', 'expose', 'deployment',
+                         config['metadata']['name']])
+        return tracker
 
     def _wait_on_service(self, service_name, containers_nb,
                          total_nb=None, inverse=False):
@@ -344,3 +246,7 @@ class Benchmark:
                     self.logger.debug(
                         'current_total_nb={:d}, total_nb={:d}'.format(
                             current_total_nb, total_nb))
+
+    def _wait_on_job_completion(self, job):
+        # TODO find out how to get when a job is completed
+        pass

@@ -103,6 +103,7 @@ if __name__ == '__main__':
         repository = APP_CONFIG['repository']['name']
 
     if args.churn:
+        raise AttributeError("Churn not supported yet")
         churn = Churn(
             hosts_filename=hosts_fname,
             service_name=APP_CONFIG['service']['name'],
