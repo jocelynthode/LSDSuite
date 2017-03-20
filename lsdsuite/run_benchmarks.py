@@ -47,6 +47,10 @@ if __name__ == '__main__':
         'app_config',
         type=argparse.FileType('r'),
         help='Application configuration file')
+    parser.add_argument(
+        'tracker_config',
+        type=argparse.FileType('r'),
+        help='Tracker configuration file')
     parser.add_argument('-l', '--local', action='store_true',
                         help='Run locally')
     parser.add_argument(
@@ -83,8 +87,9 @@ if __name__ == '__main__':
              'should the tester start in ms')
 
     args = parser.parse_args()
-    APP_CONFIG = yaml.load(args.app_config)
-    use_tracker = True if 'tracker' in APP_CONFIG else False
+    job_config = yaml.load(args.app_config)
+    tracker_config = yaml.load(args.tracker_config)
+
 
     if args.verbose:
         log_level = logging.DEBUG
@@ -100,13 +105,13 @@ if __name__ == '__main__':
         repository = ''
     else:
         hosts_fname = 'config/hosts'
-        repository = APP_CONFIG['repository']['name']
+        repository = job_config['repository']['name']
 
     if args.churn:
         raise AttributeError("Churn not supported yet")
         churn = Churn(
             hosts_filename=hosts_fname,
-            service_name=APP_CONFIG['service']['name'],
+            service_name=job_config['service']['name'],
             repository=repository,
             period=args.period,
             delay=args.delay,
@@ -115,10 +120,10 @@ if __name__ == '__main__':
     else:
         churn = None
     benchmark = Benchmark(
-        APP_CONFIG,
+        job_config,
         CLUSTER_PARAMETERS,
         args.local,
-        use_tracker,
+        tracker_config,
         churn)
     benchmark.set_logger_level(log_level)
 

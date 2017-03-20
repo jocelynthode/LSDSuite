@@ -17,7 +17,7 @@ class Benchmark:
     A class in charge of Setting up and running a benchmark
     """
 
-    def __init__(self, job_config, cluster_config, local, tracker_config = None,
+    def __init__(self, job_config, cluster_config, local, tracker_config=None,
                  churn=None,
                  client=None):
         if client is None:
@@ -31,6 +31,8 @@ class Benchmark:
         self.logger = logging.getLogger('benchmarks')
         self.churn = churn
         self.tracker_config = tracker_config
+        self.job = None
+        self.tracker = None
 
     def run(self, time_add, time_to_run, peer_number, runs=1):
         """
@@ -49,20 +51,20 @@ class Benchmark:
 
         for run_nb, _ in enumerate(range(runs), 1):
             if self.tracker_config:
-                tracker = self._create_service(
-                    self.tracker_config)
+                self.tracker = self._create_service()
 
             time_to_start = int((time.time() * 1000) + time_add)
             self.logger.debug(
                 datetime.utcfromtimestamp(
                     time_to_start /
                     1000).isoformat())
-            environment_vars = [{'name': 'PEER_NUMBER', 'value': peer_number},
-                                {'name': 'TIME', 'value': time_to_start},
-                                {'name': 'TIME_TO_RUN', 'value': time_to_run}]
-
-            job = self._create_service(self.job_config)
-            job.obj['spec']['template']['spec']['containers'][0]['env'] += environment_vars
+            environment_vars = [{'name': 'PEER_NUMBER',
+                                 'value': str(peer_number)},
+                                {'name': 'TIME', 'value': str(time_to_start)},
+                                {'name': 'TIME_TO_RUN',
+                                 'value': str(time_to_run)}]
+            self.job_config['spec']['template']['spec']['containers'][0]['env'] += environment_vars
+            self.job = self._create_job()
 
             self.logger.info(
                 'Running Benchmark -> Experiment: {:d}/{:d}'.format(
@@ -92,11 +94,11 @@ class Benchmark:
 
             else:
                 self.logger.info('Running without churn')
-                self._wait_on_job_completion(job)
+                self._wait_on_job_completion()
             if self.tracker_config:
-                self.stop(job, tracker=tracker)
+                self.stop()
             else:
-                self.stop(job)
+                self.stop()
 
             self.logger.info('Services removed')
             time.sleep(30)
@@ -125,15 +127,23 @@ class Benchmark:
 
         self.logger.info('Benchmark done!')
 
-    def stop(self, job, is_signal=False, tracker=None):
+    def stop(self, is_signal=False):
         """
         Stop the benchmark and get every logs
 
         :return:
         """
-        job.delete()
-        if self.tracker_config and tracker is not None:
-            tracker.delete()
+        self.job.delete()
+        self.logger.info("Job {:s} was deleted"
+                         .format(self.job_config['metadata']['name']))
+        if self.tracker_config and self.tracker is not None:
+            self.tracker.delete()
+            self.logger.info("Deployment {:s} was deleted"
+                             .format(self.tracker_config['metadata']['name']))
+            process = subprocess.run(['kubectl', 'delete', 'service',
+                            self.tracker_config['metadata']['name']],
+                           stdout=subprocess.PIPE, encoding='utf-8')
+            self.logger.info(process.stdout)
         if not self.local and is_signal:
             time.sleep(15)
             with open('config/hosts', 'r') as file:
@@ -200,13 +210,16 @@ class Benchmark:
         self.logger.info('Churn finished')
 
     def _create_service(
-            self,
-            config):
-        tracker = pykube.Deployment(self.client, config)
+            self):
+        tracker = pykube.Deployment(self.client, self.tracker_config)
         tracker.create()
+        self.logger.info("Deployment {:s} was created"
+                         .format(self.tracker_config['metadata']['name']))
         # TODO check if it can  be improved
-        subprocess.run(['kubectl', 'expose', 'deployment',
-                         config['metadata']['name']])
+        process = subprocess.run(['kubectl', 'expose', 'deployment',
+                       self.tracker_config['metadata']['name']],
+                       stdout=subprocess.PIPE, encoding='utf-8')
+        self.logger.info(process.stdout)
         return tracker
 
     def _wait_on_service(self, service_name, containers_nb,
@@ -247,6 +260,16 @@ class Benchmark:
                         'current_total_nb={:d}, total_nb={:d}'.format(
                             current_total_nb, total_nb))
 
-    def _wait_on_job_completion(self, job):
-        # TODO find out how to get when a job is completed
-        pass
+    def _wait_on_job_completion(self):
+        watch = self.job.watch()
+        # TODO stop when all we have x/x jobs completed
+        for watch_event in watch:
+            print(watch_event.type)
+        return
+
+    def _create_job(self):
+        job = pykube.Job(self.client, self.job_config)
+        job.create()
+        self.logger.info("Job {:s} was created"
+                         .format(self.job_config['metadata']['name']))
+        return job
