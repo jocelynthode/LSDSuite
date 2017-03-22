@@ -1,19 +1,19 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: # <JOB-NAME>
+  name: # <JOB-NAME> Example: jgroups-job
 spec:
   completions: 10
   parallelism: 10
   template:
     metadata:
       labels:
-        app: # <APP-NAME>
+        app: # <APP-NAME> Example: jgroups
     spec:
       containers:
-      - name: jgroups
-        image: # <IMAGE>
-        env: # PUT YOUR ARGS
+      - name: # <CONTAINER-NAME> Example: jgroups
+        image: # <IMAGE> Example: hello-world or jocelynthode/jgroups
+        env: # PUT YOUR ARGS REQUIRED BY YOUR APP
         - name: ARG1
           value: "1000"
         - name: ARG2
@@ -28,4 +28,5 @@ spec:
       volumes:
       - name: data
         hostPath:
-         path: # <PATH/TO/LOGS>
+         # Note: If you are using minikube the access path would be /hosthome/foobar/tmp/data for Linux (more information on https://github.com/kubernetes/minikube
+         path: # <PATH/TO/LOGS> Example: /home/foobar/tmp/data

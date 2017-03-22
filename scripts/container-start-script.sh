@@ -34,7 +34,7 @@ trap 'signal_handler' SIGUSR1
 dstat -n -N eth0 --output "/data/capture/${MY_IP_ADDR[0]}.csv" &
 dstat_pid=${!}
 
-# <APP COMMAND> &
+# <APP COMMAND> & Example: <java -jar HelloWorld.jar &>
 app_pid=${!}
 
 wait ${app_pid}

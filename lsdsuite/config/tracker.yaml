@@ -1,17 +1,17 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: # <TRACKER-NAME>
+  name: # <TRACKER-NAME> Example: jgroups-service
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: # <APP-NAME>
+        app: # <APP-NAME> Example: jgroups-tracker
     spec:
       containers:
-      - name: # <CONTAINER-NAME>
-        image: # <IMAGE-NAME>
+      - name: # <CONTAINER-NAME> Example: jgroups-tracker
+        image: # <IMAGE-NAME> Example: jocelynthode/jgroups-tracker
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: # <PORT NUMBER>
+        - containerPort: # <PORT NUMBER> Example: 12001

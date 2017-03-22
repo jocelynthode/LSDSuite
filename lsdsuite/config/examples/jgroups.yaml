@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: jgroups-job
+spec:
+  completions: 10
+  parallelism: 10
+  template:
+    metadata:
+      labels:
+        app: jgroups
+    spec:
+      containers:
+      - name: jgroups
+        image: jocelynthode/jgroups
+        env:
+        - name: RATE
+          value: "1000"
+        - name: FIXED_RATE
+          value: "10"
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      restartPolicy: "Never"
+      volumes:
+      - name: data
+        hostPath:
+         path: /hosthome/jocelyn/tmp/data
