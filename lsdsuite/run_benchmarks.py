@@ -14,11 +14,10 @@ import signal
 from logging import config
 
 import yaml
-from lsdssuite import Benchmark
-from lsdssuite import Churn
+from lsdsuite import Benchmark
+from lsdsuite import Churn
 
-with open('config/config.yaml', 'r') as f:
-    CLUSTER_PARAMETERS = yaml.load(f)
+K8S_CONFIG = '/home/<user>/.kube/config'
 
 
 def create_logger():
@@ -32,10 +31,6 @@ if __name__ == '__main__':
         description='Run benchmarks',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        'peer_number',
-        type=int,
-        help='With how many peer should it be ran')
-    parser.add_argument(
         'time_add',
         type=int,
         help='Delay experiments start in seconds')
@@ -48,7 +43,8 @@ if __name__ == '__main__':
         type=argparse.FileType('r'),
         help='Application configuration file')
     parser.add_argument(
-        'tracker_config',
+        '-t',
+        '--tracker',
         type=argparse.FileType('r'),
         help='Tracker configuration file')
     parser.add_argument('-l', '--local', action='store_true',
@@ -65,30 +61,32 @@ if __name__ == '__main__':
         action='store_true',
         help='Switch DEBUG logging on')
 
-    subparsers = parser.add_subparsers(
-        dest='churn', help='Specify churn and its arguments')
-
-    churn_parser = subparsers.add_parser('churn', help='Activate churn')
-    churn_parser.add_argument(
-        'period',
-        type=int,
-        help='The interval between killing/adding new containers in ms')
-    churn_parser.add_argument(
-        '--synthetic',
-        '-s',
-        action='store_true',
-        help='Whether to use synthetic churn or not')
-    churn_parser.add_argument(
-        '--delay',
-        '-d',
-        type=int,
-        default=0,
-        help='With how much delay compared to the tester '
-             'should the tester start in ms')
+    # subparsers = parser.add_subparsers(
+    #     dest='churn', help='Specify churn and its arguments')
+    #
+    # churn_parser = subparsers.add_parser('churn', help='Activate churn')
+    # churn_parser.add_argument(
+    #     'period',
+    #     type=int,
+    #     help='The interval between killing/adding new containers in ms')
+    # churn_parser.add_argument(
+    #     '--synthetic',
+    #     '-s',
+    #     action='store_true',
+    #     help='Whether to use synthetic churn or not')
+    # churn_parser.add_argument(
+    #     '--delay',
+    #     '-d',
+    #     type=int,
+    #     default=0,
+    #     help='With how much delay compared to the tester '
+    #          'should the tester start in ms')
 
     args = parser.parse_args()
+    print(args)
+    exit(1)
     job_config = yaml.load(args.app_config)
-    tracker_config = yaml.load(args.tracker_config)
+    tracker_config = yaml.load(args.tracker) if args.tracker else None
 
 
     if args.verbose:
@@ -135,4 +133,4 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    benchmark.run(args.time_add, args.time_to_run, args.peer_number, args.runs)
+    benchmark.run(args.time_add, args.time_to_run, args.runs)

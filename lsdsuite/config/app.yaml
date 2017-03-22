@@ -1,16 +1,31 @@
-service:
-  name: "service_name"
-  network:
-    name: "network_name"
-    subnet: "x.x.x.x/y"
-  mem_limit: 314572800
-  parameters:
-    SOME: 500
-    PARAMS: 1000
-    FOR: 26
-    YOUR: 4
-    APP: 0
-repository:
-  name: "repository-with-trailing-slash/"
-tracker: # Only add if you plan on using a tracker
-  name: "tracker_name"
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: # <JOB-NAME>
+spec:
+  completions: 10
+  parallelism: 10
+  template:
+    metadata:
+      labels:
+        app: # <APP-NAME>
+    spec:
+      containers:
+      - name: jgroups
+        image: # <IMAGE>
+        env: # PUT YOUR ARGS
+        - name: ARG1
+          value: "1000"
+        - name: ARG2
+          value: "FOOBAR"
+        - name: ARGN
+          value: "BARFOO"
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      restartPolicy: "Never"
+      volumes:
+      - name: data
+        hostPath:
+         path: # <PATH/TO/LOGS>

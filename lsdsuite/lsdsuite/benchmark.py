@@ -34,20 +34,18 @@ class Benchmark:
         self.job = None
         self.tracker = None
 
-    def run(self, time_add, time_to_run, peer_number, runs=1):
+    def run(self, time_add, time_to_run, runs=1):
         """
         Run the benchmark
 
-        :param peer_number: How many starting peers
         :param time_add: How much time before starting the benchmark
         :param time_to_run: How much time to run the benchmark for
         :param runs: RUn the benchmark how many time
         """
         time_add *= 1000
         time_to_run *= 1000
-        log_storage = (self.cluster_config['local_data']
-                       if self.local
-                       else self.cluster_config['cluster_data'])
+        peer_number = self.job_config['spec']['completions']
+        log_storage = self.job_config['spec']['template']['spec']['volumes'][0]['hostPath']['path']
 
         for run_nb, _ in enumerate(range(runs), 1):
             if self.tracker_config:
@@ -101,7 +99,7 @@ class Benchmark:
                 self.stop()
 
             self.logger.info('Services removed')
-            time.sleep(30)
+            time.sleep(10)
 
             if not self.local:
                 subprocess.call(
@@ -261,10 +259,24 @@ class Benchmark:
                             current_total_nb, total_nb))
 
     def _wait_on_job_completion(self):
-        watch = self.job.watch()
-        # TODO stop when all we have x/x jobs completed
-        for watch_event in watch:
-            print(watch_event.type)
+        # TODO improve this code
+        needed_completions = self.job_config['spec']['completions']
+        completed_process = (subprocess
+            .check_output('kubectl get job jgroups-job | '
+                          'tail -1 | '
+                          'awk \'{print $3}\'',
+                          shell=True, universal_newlines=True).strip())
+        while int(completed_process) != needed_completions:
+            self.logger.debug("Completed processes: {}"
+                              .format(completed_process))
+            time.sleep(10)
+            completed_process = (subprocess
+                                 .check_output('kubectl get job jgroups-job | '
+                                               'tail -1 | '
+                                               'awk \'{print $3}\'',
+                                               shell=True,
+                                               universal_newlines=True).strip())
+        self.logger.info("All processes are completed")
         return
 
     def _create_job(self):
